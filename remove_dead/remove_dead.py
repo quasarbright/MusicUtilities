@@ -89,17 +89,24 @@ def printTagAndText(element):
     print('<{0}>{1}</{0}>'.format(element.tag, element.text))
 
 def getAllTrackElements():
-    tracks = followIndexPath([17])
-    return tracks
+    for index, child in enumerate(root):
+        if child.tag == 'key' and child.text == 'Tracks':
+            return root[index+1]
+
+def getAllPlaylistElements():
+    for index, child in enumerate(root):
+        if child.tag == 'key' and child.text == 'Playlists':
+            return root[index+1]
 
 def dictIter(element):
     assertDict(element)
-    for i in range(len(element)//2):
-        keyIndex = i*2
-        valueIndex = i*2+1
+    ans = []
+    for keyIndex in range(0, len(element), 2):
+        valueIndex = keyIndex+1
         key = element[keyIndex]
         value = element[valueIndex]
-        yield key, value
+        ans.append((key, value))
+    return ans
 
 def assertDict(element):
     if not element.tag == 'dict':
@@ -110,11 +117,13 @@ def assertDict(element):
             element, validation[1]))
 
 def getDictValue(element, key):
+    '''key: string
+    returns: element'''
     assertDict(element)
     for currentKey, currentValue in dictIter(element):
         if currentKey.text == key:
-            return currentValue.text
-    raise KeyError("key {} does not found in {}".format(key, element))
+            return currentValue
+    raise KeyError("key '{}' not found in {}".format(key, element))
 
 def toPy(element):
     '''converts element to python dict or list
@@ -165,10 +174,11 @@ def doesUriExist(uri):
 def doesSongElementHaveValidLink(element):
     '''
     expects element to be the dict of a song
-    should have mp3 metadata as keys
+    (should have mp3 metadata as keys)
     '''
     assertDict(element)
     location = getDictValue(element, 'Location')
+    location = location.text
     return doesUriExist(location)
 
 def getSongById(id):
@@ -181,20 +191,45 @@ def getSongById(id):
 
 def doesSongIdHaveValidLink(id):
     '''expects track id as int'''
+    song = getSongById(id)
+    return doesSongElementHaveValidLink(song)
 
 
 def removeSong(id):
     '''removes all instances of the track
     id: int or int string track id'''
     # remove from all tracks
-    for trackId, track in dictIter(getAllTrackElements()):
+    allSongs = getAllTrackElements()
+    for trackId, trackDict in dictIter(allSongs):
         if trackId.text == str(id):
-            pass
-
-
+            # remove trackId and trackDict elements
+            allSongs.remove(trackId)
+            allSongs.remove(trackDict)
+    # remove from playlists
+    allPlaylists = getAllPlaylistElements()
+    for playlist in allPlaylists:
+        try:
+            items = getDictValue(playlist, 'Playlist Items')
+        except KeyError:
+            # playlist is empty
+            continue
+        for item in items:
+            # each item is <dict><key>Track ID</key><integer>1234</integer></dict>
+            trackId = getDictValue(item, 'Track ID')
+            if trackId.text == str(id):
+                items.remove(item)
 
 def removeDeads():
     '''removes all dead song elemements in place'''
-    pass
+    for trackId, trackDict in dictIter(getAllTrackElements()):
+        if not doesSongElementHaveValidLink(trackDict):
+            # dead link. remove from library
+            removeSong(int(trackId.text))
 
-# dumpNSongs(2)
+
+def writeToTest():
+    tree.write('testOutputLibrary.xml')
+
+removeDeads()
+writeToTest()
+print()
