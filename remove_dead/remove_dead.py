@@ -1,5 +1,6 @@
 import os
 import argparse
+import re
 import xml.etree.ElementTree as ET
 from urllib.parse import unquote
 # import plistlib
@@ -11,8 +12,8 @@ arguments = parser.parse_args()
 libraryFilePath = arguments.FILE
 
 tree = ET.parse(libraryFilePath)
-root = tree.getroot()
-root = root[0]
+trueRoot = tree.getroot()
+root = trueRoot[0]
 
 def allTags(element, tagsAccumulator=set([])):
     for child in element:
@@ -120,9 +121,12 @@ def getDictValue(element, key):
     '''key: string
     returns: element'''
     assertDict(element)
-    for currentKey, currentValue in dictIter(element):
-        if currentKey.text == key:
-            return currentValue
+    # for currentKey, currentValue in dictIter(element):
+    #     if currentKey.text == key:
+    #         return currentValue
+    for index, child in enumerate(element):
+        if child.tag == 'key' and child.text == key:
+            return element[index+1]
     raise KeyError("key '{}' not found in {}".format(key, element))
 
 def toPy(element):
@@ -226,10 +230,34 @@ def removeDeads():
             # dead link. remove from library
             removeSong(int(trackId.text))
 
-
+def writeFile(path):
+    tree.write(path, encoding='utf-8')
+    content = ''
+    with open(path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    prefix = '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+    content = prefix + content
+    content += '\n'
+    content = re.sub(r'<(\w+) />', r'<\1/>', content)
+    content = re.sub(r'&amp', r'&#38', content)
+    content = re.sub(r'&lt', r'&#60', content)
+    content = re.sub(r'&gt', r'&#62', content)
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(content)
+    # contents = ET.tostring(trueRoot, encoding='unicode')
+    # lines = contents.splitlines()
+    # prefix = ['<?xml version="1.0" encoding="UTF-8"?>', '<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">']
+    # finalLines = prefix[:]
+    # finalLines.extend(lines)
+    # finalContents = '\n'.join(finalLines)
+    # # trailing newline
+    # finalContents += '\n'
+    # with open(path, 'w', encoding='utf-8') as outfile:
+    #     outfile.write(finalContents)
+    
 def writeToTest():
-    tree.write('testOutputLibrary.xml')
+    writeFile('testOutputLibrary.xml')
 
 removeDeads()
 writeToTest()
-print()
+print(isValid(root))
