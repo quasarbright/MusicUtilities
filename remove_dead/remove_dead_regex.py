@@ -1,3 +1,6 @@
+'''
+decided on just doing it the iTunes way. This script is not finished
+'''
 from typing import List
 import os
 import argparse
